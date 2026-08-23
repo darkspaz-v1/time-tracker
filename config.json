@@ -1,0 +1,12 @@
+{
+  "idle_threshold_minutes": 3,
+  "poll_interval_seconds": 5,
+  "flush_interval_seconds": 60,
+  "buckets": [
+    {"name": "Claude Code", "processes": ["claude.exe"], "title_keywords": ["claude code"]},
+    {"name": "Gesture Studio", "processes": [], "title_keywords": ["gesture-app", "gesture studio"]},
+    {"name": "ComfyUI", "processes": [], "title_keywords": ["comfyui"]},
+    {"name": "Web Agency / Stripe", "processes": [], "title_keywords": ["stripe", "dashboard.stripe"]},
+    {"name": "Content Creation", "processes": [], "title_keywords": ["premiere", "davinci resolve", "capcut", "youtube studio"]}
+  ]
+}
