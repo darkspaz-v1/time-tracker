@@ -44,11 +44,6 @@ def test_idle_seconds_from_ticks_basic():
     assert idle_seconds_from_ticks(10_000, 7_500) == 2.5
 
 
-def test_idle_seconds_never_negative():
-    assert idle_seconds_from_ticks(1_000, 5_000) == 0.0
-
-
-@pytest.mark.xfail(strict=True, reason="known bug: 32-bit tick wraparound reports 0 idle (fixed in next commit)")
 def test_idle_seconds_survives_tick_counter_wraparound():
     # GetTickCount is a 32-bit millisecond counter that wraps every ~49.7 days.
     # Last input just before the wrap, "now" just after: 3 seconds idle, not 0.
@@ -116,6 +111,23 @@ def test_daylog_ignores_non_positive_and_skips_clean_flush(tmp_path):
     log.add_seconds("d", "A", -4)
     log.flush()
     assert not path.exists()
+
+
+def test_daylog_flush_is_atomic(tmp_path, monkeypatch):
+    path = tmp_path / "log.json"
+    log = DayLog(path)
+    log.add_seconds("d", "A", 10)
+    log.flush()
+    log.add_seconds("d", "A", 5)
+
+    def boom(*a, **k):
+        raise OSError("simulated crash before replace")
+
+    monkeypatch.setattr("tracker.os.replace", boom)
+    with pytest.raises(OSError):
+        log.flush()
+    # Original file still holds the last good state and is still valid JSON.
+    assert json.loads(path.read_text(encoding="utf-8")) == {"d": {"A": 10}}
 
 
 def test_daylog_corrupt_file_starts_empty(tmp_path):

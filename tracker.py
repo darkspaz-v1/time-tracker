@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 IDLE_BUCKET = "_idle"
@@ -11,7 +12,9 @@ def is_idle(idle_seconds, threshold_minutes):
 
 def idle_seconds_from_ticks(now_tick_ms, last_input_tick_ms):
     """Idle seconds from two GetTickCount-style millisecond timestamps."""
-    return max(0.0, (now_tick_ms - last_input_tick_ms) / 1000.0)
+    # Mask to 32 bits: GetTickCount wraps every ~49.7 days, and a plain subtraction
+    # across the wrap would go negative and read as "no idle time".
+    return ((now_tick_ms - last_input_tick_ms) & 0xFFFFFFFF) / 1000.0
 
 
 def cap_elapsed(elapsed, poll_interval_seconds):
@@ -71,7 +74,12 @@ class DayLog:
     def flush(self):
         if not self._dirty:
             return
-        self.path.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+        # Write to a temp file then os.replace: a crash mid-write used to leave a
+        # truncated time_log.json, which _load reads as {} and the next flush then
+        # overwrote - losing every previous day.
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        tmp.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+        os.replace(tmp, self.path)
         self._dirty = False
 
     def add_seconds(self, date_str, bucket, seconds):
