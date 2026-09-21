@@ -13,7 +13,7 @@ from PIL import ImageTk
 
 from foreground import get_foreground_info, get_idle_seconds
 from icon import app_icon
-from tracker import IDLE_BUCKET, DayLog, bucket_for
+from tracker import IDLE_BUCKET, DayLog, bucket_for, cap_elapsed, format_hms, is_idle
 
 APP_DIR = Path(__file__).parent
 CONFIG_PATH = APP_DIR / "config.json"
@@ -75,17 +75,6 @@ def _pick_mono_font():
         if name in families:
             return name
     return "Consolas"
-
-
-def format_hms(seconds):
-    seconds = int(seconds)
-    h, rem = divmod(seconds, 3600)
-    m, s = divmod(rem, 60)
-    if h:
-        return f"{h}h {m:02d}m"
-    if m:
-        return f"{m}m {s:02d}s"
-    return f"{s}s"
 
 
 class TimeTrackerApp:
@@ -169,16 +158,12 @@ class TimeTrackerApp:
         now = time.time()
         elapsed = now - self._last_poll_time
         self._last_poll_time = now
-        # Cap elapsed time so a laptop sleep/suspend gap (Tk's `after` timers don't
-        # fire while suspended, so the next poll can see a multi-hour gap) doesn't
-        # get misattributed as active/idle time in whatever bucket happens to be
-        # current the moment the machine wakes.
-        elapsed = min(elapsed, self.config["poll_interval_seconds"] * 3)
+        # Cap so a suspend/resume gap isn't credited to whatever bucket is current on wake.
+        elapsed = cap_elapsed(elapsed, self.config["poll_interval_seconds"])
 
         if not self._paused:
             idle_seconds = get_idle_seconds()
-            idle_threshold = self.config.get("idle_threshold_minutes", 3) * 60
-            if idle_seconds < idle_threshold:
+            if not is_idle(idle_seconds, self.config.get("idle_threshold_minutes", 3)):
                 process_name, title = get_foreground_info()
                 bucket = bucket_for(process_name, title, self.config)
                 self.log.add_seconds(self._today_key(), bucket, elapsed)

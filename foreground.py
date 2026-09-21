@@ -3,6 +3,8 @@ from ctypes import wintypes
 
 import psutil
 
+from tracker import idle_seconds_from_ticks
+
 _user32 = ctypes.windll.user32
 _kernel32 = ctypes.windll.kernel32
 
@@ -56,6 +58,4 @@ def get_idle_seconds():
     lii = _LASTINPUTINFO()
     lii.cbSize = ctypes.sizeof(_LASTINPUTINFO)
     _user32.GetLastInputInfo(ctypes.byref(lii))
-    millis_since_boot = _kernel32.GetTickCount()
-    idle_millis = millis_since_boot - lii.dwTime
-    return max(0.0, idle_millis / 1000.0)
+    return idle_seconds_from_ticks(_kernel32.GetTickCount(), lii.dwTime)

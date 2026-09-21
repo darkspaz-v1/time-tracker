@@ -4,6 +4,34 @@ from pathlib import Path
 IDLE_BUCKET = "_idle"
 
 
+def is_idle(idle_seconds, threshold_minutes):
+    """True once input has been idle for at least the configured threshold."""
+    return idle_seconds >= threshold_minutes * 60
+
+
+def idle_seconds_from_ticks(now_tick_ms, last_input_tick_ms):
+    """Idle seconds from two GetTickCount-style millisecond timestamps."""
+    return max(0.0, (now_tick_ms - last_input_tick_ms) / 1000.0)
+
+
+def cap_elapsed(elapsed, poll_interval_seconds):
+    """Cap the time credited per poll at 3x the interval. Tk's `after` timers don't
+    fire while the machine is suspended, so the next poll can see a multi-hour gap
+    that must not be attributed to whatever bucket is current on wake."""
+    return min(elapsed, poll_interval_seconds * 3)
+
+
+def format_hms(seconds):
+    seconds = int(seconds)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m"
+    if m:
+        return f"{m}m {s:02d}s"
+    return f"{s}s"
+
+
 def bucket_for(process_name, title, config):
     """First matching configured bucket wins; otherwise falls back to a
     per-process bucket so unconfigured apps still show up individually
