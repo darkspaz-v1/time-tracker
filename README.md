@@ -1,5 +1,7 @@
 # Time Tracker
 
+[![CI](https://github.com/darkspaz-v1/time-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/darkspaz-v1/time-tracker/actions/workflows/ci.yml)
+
 Where your time actually went, per project, with no manual start/stop.
 
 ## How it works
@@ -38,11 +40,29 @@ framework — the only thing they share is a set of conventions.
 ## Running it
 
 ```
+py -m venv venv
+venv\Scripts\pip install -r requirements.txt
 run.bat
 ```
 
-That creates the virtualenv on first run, installs `requirements.txt`, and starts the app. Windows
-only — these use Win32 APIs and a system tray.
+Create the virtualenv and install once; after that `run.bat` starts the tray app using `venv\Scripts\pythonw.exe`.
+Windows only — these use Win32 APIs and a system tray.
+
+## Development
+
+```
+venv\Scripts\pip install -r requirements-dev.txt
+venv\Scripts\python -m pytest
+venv\Scriptsuff check .
+```
+
+The tests cover the pure logic only (idle threshold, window-title bucketing, log persistence); they never
+open a window. CI runs the same two commands on Windows with Python 3.12 and 3.13.
+
+## Troubleshooting
+
+Log file location: `logs/time-tracker.log` next to `app.py` (rotating, 1 MB x 3). Set `APP_LOG_LEVEL=DEBUG`
+before launching to also record errors the app deliberately ignores. A crash traceback goes to `app_error.log`.
 
 ## License
 
