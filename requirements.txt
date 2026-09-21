@@ -1,3 +1,3 @@
-pystray
-pillow
-psutil
+pystray>=0.19.5,<0.20
+pillow>=12.3,<13
+psutil>=7.2,<8
