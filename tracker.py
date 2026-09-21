@@ -1,6 +1,9 @@
 import json
+import logging
 import os
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 IDLE_BUCKET = "_idle"
 
@@ -68,7 +71,10 @@ class DayLog:
     def _load(self):
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError:
+            return {}  # first run: nothing logged yet
+        except json.JSONDecodeError:
+            log.warning("%s is not valid JSON; starting an empty log", self.path, exc_info=True)
             return {}
 
     def flush(self):

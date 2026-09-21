@@ -1,9 +1,12 @@
 import ctypes
+import logging
 from ctypes import wintypes
 
 import psutil
 
 from tracker import idle_seconds_from_ticks
+
+log = logging.getLogger(__name__)
 
 _user32 = ctypes.windll.user32
 _kernel32 = ctypes.windll.kernel32
@@ -48,6 +51,9 @@ def get_foreground_info():
         try:
             process_name = psutil.Process(pid.value).name().lower()
         except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError):
+            # Expected for elevated/protected/just-exited windows; the caller
+            # buckets by title or "Other: unknown" when the name is None.
+            log.debug("cannot resolve process name for pid %s", pid.value, exc_info=True)
             process_name = None
 
     return process_name, title

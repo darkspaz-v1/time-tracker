@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 *.lock
 time_log.json
+logs/
+app_error.log

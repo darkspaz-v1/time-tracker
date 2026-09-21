@@ -1,4 +1,5 @@
 import json
+import logging
 import msvcrt
 import queue
 import threading
@@ -11,6 +12,7 @@ from pathlib import Path
 import pystray
 from PIL import ImageTk
 
+from applog import setup_logging
 from foreground import get_foreground_info, get_idle_seconds
 from icon import app_icon
 from tracker import IDLE_BUCKET, DayLog, bucket_for, cap_elapsed, format_hms, is_idle
@@ -21,6 +23,7 @@ LOG_PATH = APP_DIR / "time_log.json"
 LOCK_PATH = APP_DIR / ".singleton.lock"
 SHOW_SIGNAL_PATH = APP_DIR / ".show_signal"
 _lock_file = None
+log = logging.getLogger("time-tracker")
 
 INK = "#12131C"
 PANEL = "#1B1D2B"
@@ -53,7 +56,9 @@ def _acquire_single_instance_lock():
         try:
             SHOW_SIGNAL_PATH.touch()
         except OSError:
-            pass
+            # Best effort: the second launch is exiting anyway; the only loss is
+            # that the running instance doesn't raise its window.
+            log.debug("could not write show-signal file", exc_info=True)
         return False
     _lock_file = f
     return True
@@ -119,7 +124,8 @@ class TimeTrackerApp:
             try:
                 SHOW_SIGNAL_PATH.unlink()
             except OSError:
-                pass
+                # Best effort: worst case the window is raised again on the next tick.
+                log.debug("could not remove show-signal file", exc_info=True)
             self.root.deiconify()
             self.root.lift()
         self.root.after(50, self._drain_ui_queue)
@@ -249,6 +255,7 @@ class TimeTrackerApp:
 
 
 def main():
+    setup_logging("time-tracker")
     if not _acquire_single_instance_lock():
         return
     app = TimeTrackerApp()
@@ -260,6 +267,8 @@ if __name__ == "__main__":
         main()
     except Exception:
         import traceback
+
+        log.exception("fatal error")
 
         with open(APP_DIR / "app_error.log", "a", encoding="utf-8") as f:
             f.write(f"\n--- {time.ctime()} ---\n")
