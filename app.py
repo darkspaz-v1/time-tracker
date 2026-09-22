@@ -1,4 +1,5 @@
 import json
+import logging
 import msvcrt
 import queue
 import threading
@@ -11,9 +12,10 @@ from pathlib import Path
 import pystray
 from PIL import ImageTk
 
+from applog import setup_logging
 from foreground import get_foreground_info, get_idle_seconds
 from icon import app_icon
-from tracker import IDLE_BUCKET, DayLog, bucket_for
+from tracker import IDLE_BUCKET, DayLog, bucket_for, cap_elapsed, format_hms, is_idle
 
 APP_DIR = Path(__file__).parent
 CONFIG_PATH = APP_DIR / "config.json"
@@ -21,6 +23,7 @@ LOG_PATH = APP_DIR / "time_log.json"
 LOCK_PATH = APP_DIR / ".singleton.lock"
 SHOW_SIGNAL_PATH = APP_DIR / ".show_signal"
 _lock_file = None
+log = logging.getLogger("time-tracker")
 
 INK = "#12131C"
 PANEL = "#1B1D2B"
@@ -53,7 +56,9 @@ def _acquire_single_instance_lock():
         try:
             SHOW_SIGNAL_PATH.touch()
         except OSError:
-            pass
+            # Best effort: the second launch is exiting anyway; the only loss is
+            # that the running instance doesn't raise its window.
+            log.debug("could not write show-signal file", exc_info=True)
         return False
     _lock_file = f
     return True
@@ -75,17 +80,6 @@ def _pick_mono_font():
         if name in families:
             return name
     return "Consolas"
-
-
-def format_hms(seconds):
-    seconds = int(seconds)
-    h, rem = divmod(seconds, 3600)
-    m, s = divmod(rem, 60)
-    if h:
-        return f"{h}h {m:02d}m"
-    if m:
-        return f"{m}m {s:02d}s"
-    return f"{s}s"
 
 
 class TimeTrackerApp:
@@ -130,7 +124,8 @@ class TimeTrackerApp:
             try:
                 SHOW_SIGNAL_PATH.unlink()
             except OSError:
-                pass
+                # Best effort: worst case the window is raised again on the next tick.
+                log.debug("could not remove show-signal file", exc_info=True)
             self.root.deiconify()
             self.root.lift()
         self.root.after(50, self._drain_ui_queue)
@@ -169,16 +164,12 @@ class TimeTrackerApp:
         now = time.time()
         elapsed = now - self._last_poll_time
         self._last_poll_time = now
-        # Cap elapsed time so a laptop sleep/suspend gap (Tk's `after` timers don't
-        # fire while suspended, so the next poll can see a multi-hour gap) doesn't
-        # get misattributed as active/idle time in whatever bucket happens to be
-        # current the moment the machine wakes.
-        elapsed = min(elapsed, self.config["poll_interval_seconds"] * 3)
+        # Cap so a suspend/resume gap isn't credited to whatever bucket is current on wake.
+        elapsed = cap_elapsed(elapsed, self.config["poll_interval_seconds"])
 
         if not self._paused:
             idle_seconds = get_idle_seconds()
-            idle_threshold = self.config.get("idle_threshold_minutes", 3) * 60
-            if idle_seconds < idle_threshold:
+            if not is_idle(idle_seconds, self.config.get("idle_threshold_minutes", 3)):
                 process_name, title = get_foreground_info()
                 bucket = bucket_for(process_name, title, self.config)
                 self.log.add_seconds(self._today_key(), bucket, elapsed)
@@ -264,6 +255,7 @@ class TimeTrackerApp:
 
 
 def main():
+    setup_logging("time-tracker")
     if not _acquire_single_instance_lock():
         return
     app = TimeTrackerApp()
@@ -275,6 +267,8 @@ if __name__ == "__main__":
         main()
     except Exception:
         import traceback
+
+        log.exception("fatal error")
 
         with open(APP_DIR / "app_error.log", "a", encoding="utf-8") as f:
             f.write(f"\n--- {time.ctime()} ---\n")
