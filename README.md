@@ -4,6 +4,21 @@
 
 Where your time actually went, per project, with no manual start/stop.
 
+![Time Tracker panel showing a bucketed breakdown of today's activity by project, with a bar per bucket](docs/media/screenshot.png)
+
+*Example panel with invented sample data (not a real activity log).*
+
+## Quick start
+
+```
+py -m venv venv
+venv\Scripts\pip install -r requirements.txt
+run.bat
+```
+
+Create the virtualenv and install once; after that `run.bat` starts the tray app using `venv\Scripts\pythonw.exe`.
+Windows only — these use Win32 APIs and a system tray.
+
 ## How it works
 
 - Tray plus panel. Samples the foreground window and matches its process name and title against
@@ -37,23 +52,22 @@ framework — the only thing they share is a set of conventions.
 | Config lives in `config.json`, read at startup | Edit it, then fully exit the tray icon and relaunch — a running process never re-reads it |
 | Tray icon generated in code (`icon.py`) | No binary asset to keep in sync |
 
-## Running it
+## Known limitations
 
-```
-py -m venv venv
-venv\Scripts\pip install -r requirements.txt
-run.bat
-```
-
-Create the virtualenv and install once; after that `run.bat` starts the tray app using `venv\Scripts\pythonw.exe`.
-Windows only — these use Win32 APIs and a system tray.
+- **Windows only** — foreground-window detection and idle time both come from Win32 APIs; there's no
+  macOS/Linux equivalent.
+- **Idle threshold is configurable, not fixed** — `idle_threshold_minutes` in `config.json` (default 3);
+  changing it requires fully exiting the tray icon and relaunching, since config is only read at startup.
+- **Per-project bucketing depends on window-title matching** — a bucket only catches what its
+  `processes`/`title_keywords` list expects, so a renamed window title or an app not yet added to
+  `config.json` falls through to an individual `Other: <process>` entry instead of being miscategorized.
 
 ## Development
 
 ```
 venv\Scripts\pip install -r requirements-dev.txt
 venv\Scripts\python -m pytest
-venv\Scriptsuff check .
+venv\Scripts\ruff check .
 ```
 
 The tests cover the pure logic only (idle threshold, window-title bucketing, log persistence); they never
