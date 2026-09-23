@@ -4,6 +4,8 @@
 
 Where your time actually went, per project, with no manual start/stop.
 
+![Time Tracker preview](docs/images/time-tracker-preview.png)
+
 ![Time Tracker panel showing a bucketed breakdown of today's activity by project, with a bar per bucket](docs/media/screenshot.png)
 
 *Example panel with invented sample data (not a real activity log).*
